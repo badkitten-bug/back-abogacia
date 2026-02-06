@@ -3,6 +3,7 @@ import { CreateLegalDocDto } from './dto/create-legal-doc.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LegalDocument } from './entities/legal-document.entity';
+import { RagService } from '../rag/rag.service';
 
 @Injectable()
 export class LegalDocsService {
@@ -11,7 +12,12 @@ export class LegalDocsService {
   constructor(
     @InjectRepository(LegalDocument)
     private legalDocRepository: Repository<LegalDocument>,
+    private readonly ragService: RagService,
   ) {}
+
+  async indexDocument(id: string) {
+    return this.ragService.indexDocument(id);
+  }
 
   async create(createLegalDocDto: CreateLegalDocDto) {
     this.logger.log(`Creating new legal document: ${createLegalDocDto.title}`);

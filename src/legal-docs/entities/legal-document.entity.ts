@@ -26,6 +26,9 @@ export class LegalDocument {
   @Column({ type: 'boolean', default: true })
   is_active: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  is_indexed: boolean;
+
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>;
 

@@ -20,5 +20,10 @@ export class LegalDocsController {
   remove(@Param('id') id: string) {
     return this.legalDocsService.remove(id);
   }
+
+  @Post(':id/index')
+  index(@Param('id') id: string) {
+    return this.legalDocsService.indexDocument(id);
+  }
 }
 

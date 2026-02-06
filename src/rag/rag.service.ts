@@ -1,8 +1,11 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, NotFoundException } from '@nestjs/common';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { ConfigService } from '@nestjs/config';
 import { Document } from '@langchain/core/documents';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { LegalDocument } from '../legal-docs/entities/legal-document.entity';
 
 // Simple in-memory store to avoid import issues with specific LangChain versions
 class SimpleMemoryStore {
@@ -14,6 +17,7 @@ class SimpleMemoryStore {
 
   async similaritySearch(query: string, k: number = 2): Promise<Document[]> {
     // Basic keyword matching for demo purposes
+    // Ideally this should use vector embeddings
     const lowerQuery = query.toLowerCase();
     const ranked = this.documents.map(doc => {
       const content = doc.pageContent.toLowerCase();
@@ -36,6 +40,10 @@ class SimpleMemoryStore {
   addDocuments(docs: Document[]) {
     this.documents.push(...docs);
   }
+  
+  clear() {
+    this.documents = [];
+  }
 }
 
 @Injectable()
@@ -46,11 +54,15 @@ export class RagService implements OnModuleInit {
 
   constructor(
     private configService: ConfigService,
+    @InjectRepository(LegalDocument)
+    private legalDocRepository: Repository<LegalDocument>,
   ) {
     this.model = new ChatGoogleGenerativeAI({
       apiKey: this.configService.get<string>('GOOGLE_API_KEY'),
       model: this.configService.get<string>('GEMINI_MODEL') || 'gemini-1.5-flash',
     });
+    // Initialize empty store
+    this.vectorStore = new SimpleMemoryStore([]);
   }
 
   setApiKey(apiKey: string) {
@@ -63,26 +75,47 @@ export class RagService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    this.logger.log('Initializing In-Memory Vector Store with sample Peruvian laws...');
+    this.logger.log('Initializing Vector Store from Database...');
+    await this.refreshVectorStore();
+  }
+  
+  async refreshVectorStore() {
+    // Load all indexed documents from DB
+    const docs = await this.legalDocRepository.find({
+      where: { is_indexed: true, is_active: true }
+    });
     
-    // Sample data for local testing without DB
-    const sampleLaws = [
-      new Document({ 
-        pageContent: "El despido arbitrario otorga derecho a una indemnización equivalente a una remuneración y media mensual por cada año completo de servicios, con un máximo de doce remuneraciones.",
-        metadata: { source: "Ley de Productividad y Competitividad Laboral, Art. 38" }
-      }),
-      new Document({ 
-        pageContent: "La jornada ordinaria de trabajo es de ocho horas diarias o cuarenta y ocho horas semanales como máximo.",
-        metadata: { source: "Constitución Política del Perú, Art. 25" }
-      }),
-      new Document({ 
-        pageContent: "El derecho a la pensión de alimentos es irrenunciable e intransmisible.",
-        metadata: { source: "Código Civil Peruano, Art. 487" }
-      })
-    ];
+    const langchainDocs = docs.map(d => new Document({
+      pageContent: d.content,
+      metadata: { 
+        source: d.source || 'Base de datos legal',
+        id: d.id,
+        title: d.title,
+        content_type: d.content_type
+      }
+    }));
+    
+    this.vectorStore = new SimpleMemoryStore(langchainDocs);
+    this.logger.log(`Vector Store initialized with ${langchainDocs.length} documents from DB.`);
+  }
 
-    this.vectorStore = new SimpleMemoryStore(sampleLaws);
-    this.logger.log('In-Memory Vector Store ready (Simple Mode).');
+  async indexDocument(id: string) {
+    const doc = await this.legalDocRepository.findOne({ where: { id } });
+    if (!doc) throw new NotFoundException('Documento no encontrado');
+    
+    // Mark as indexed
+    doc.is_indexed = true;
+    doc.updatedAt = new Date(); // Explicit update
+    // In a real vector DB, here we would generate embedding and save to pgvector or pinecone.
+    // For now, simple textual indexing in memory is sufficient.
+    
+    await this.legalDocRepository.save(doc);
+    
+    // Refresh memory store (simple approach)
+    // Could be optimized to just add one doc, but refresh guarantees consistency
+    await this.refreshVectorStore();
+    
+    return { message: 'Documento indexado correctamente', id: doc.id };
   }
 
   async processChat(message: string, category?: string, sessionId?: string) {
@@ -93,16 +126,20 @@ export class RagService implements OnModuleInit {
 
     if (this.vectorStore) {
         try {
-            const results = await this.vectorStore.similaritySearch(message, 2);
+            const results = await this.vectorStore.similaritySearch(message, 3);
             context = results.map((r: Document) => `${r.pageContent} (Fuente: ${r.metadata.source})`).join('\n\n');
-            sources = results.map((r: Document) => ({ title: r.metadata.source, content_type: 'ley', relevance_score: 1 }));
+            sources = results.map((r: Document) => ({ 
+                title: r.metadata.title || r.metadata.source, 
+                content_type: r.metadata.content_type || 'ley', 
+                relevance_score: 1 
+            }));
         } catch (error) {
             this.logger.error('Error searching vector store', error);
         }
     }
 
     if (!context) {
-        context = "No se encontró información específica en la base de datos local de prueba.";
+        context = "No se encontró información específica en la base de datos legal actual.";
     }
 
     const prompt = ChatPromptTemplate.fromMessages([
@@ -115,7 +152,7 @@ REGLAS ESTRICTAS:
 4. No menciones palabras como "Gemini", "GPT", "LLM", "modelo de lenguaje", "inteligencia artificial" ni ningún proveedor de IA.
 5. Usa el contexto proporcionado para responder. Si la información no está en el contexto, puedes usar conocimiento general pero aclara que es información orientativa y que debe consultarse con un abogado.
 
-Contexto Legislativo:
+Contexto Legislativo Recuperado:
 {context}`],
       ['human', '{input}'],
     ]);
@@ -134,3 +171,4 @@ Contexto Legislativo:
     };
   }
 }
+
