@@ -1,0 +1,14 @@
+import { Module } from '@nestjs/common';
+import { LegalDocsService } from './legal-docs.service';
+import { LegalDocsController } from './legal-docs.controller';
+// import { TypeOrmModule } from '@nestjs/typeorm';
+// import { LegalDocument } from './entities/legal-document.entity';
+
+@Module({
+  imports: [
+    // TypeOrmModule.forFeature([LegalDocument]) // Commented out for No-Docker mode
+  ],
+  controllers: [LegalDocsController],
+  providers: [LegalDocsService],
+})
+export class LegalDocsModule {}
