@@ -14,6 +14,15 @@ export class CreateLegalDocDto {
   category?: string;
 
   @IsString()
-  @IsNotEmpty()
-  source: string; // e.g. "Ley 30512 Art 1"
+  @IsOptional()
+  content_type?: string;
+
+  @IsString()
+  @IsOptional()
+  number?: string;
+
+  @IsString()
+  @IsOptional()
+  source?: string;
 }
+

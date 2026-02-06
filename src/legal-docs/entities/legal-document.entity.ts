@@ -15,13 +15,16 @@ export class LegalDocument {
   category: string;
 
   @Column({ type: 'text', nullable: true })
-  source: string; // e.g. "Ley 30123 - Art. 5"
+  content_type: string;
 
-  // pgvector column for embeddings
-  // Note: We use 'vector' type which is provided by the pgvector extension.
-  // We'll treat it as a float array in TypeORM.
-  @Column({ type: 'vector', nullable: true })
-  embedding: number[];
+  @Column({ type: 'text', nullable: true })
+  number: string;
+
+  @Column({ type: 'text', nullable: true })
+  source: string;
+
+  @Column({ type: 'boolean', default: true })
+  is_active: boolean;
 
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>;
@@ -32,3 +35,4 @@ export class LegalDocument {
   @UpdateDateColumn()
   updatedAt: Date;
 }
+

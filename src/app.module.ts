@@ -15,29 +15,28 @@ import { LegalDocument } from './legal-docs/entities/legal-document.entity';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    // TypeOrmModule.forRootAsync({
-    //   imports: [ConfigModule],
-    //   useFactory: (configService: ConfigService) => {
-    //     const dbUrl = configService.get('DATABASE_URL');
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => {
+        const dbUrl = configService.get('DATABASE_URL');
         
-    //     const isRender = dbUrl && dbUrl.includes('render.com');
+        const isRender = dbUrl && dbUrl.includes('render.com');
         
-    //     return {
-    //       type: 'postgres',
-    //       url: dbUrl,
-    //       entities: [LegalDocument],
-    //       synchronize: true, // Be careful in production!
-    //       ssl: isRender ? { rejectUnauthorized: false } : false,
-    //       // Robustness for local dev without Docker:
-    //       keepConnectionAlive: true,
-    //       connectTimeoutMS: 5000,
-    //       extra: {
-    //         connectionTimeoutMillis: 5000,
-    //       }
-    //     };
-    //   },
-    //   inject: [ConfigService],
-    // }),
+        return {
+          type: 'postgres',
+          url: dbUrl,
+          entities: [LegalDocument],
+          synchronize: true, // Creates tables automatically
+          ssl: isRender ? { rejectUnauthorized: false } : false,
+          keepConnectionAlive: true,
+          connectTimeoutMS: 5000,
+          extra: {
+            connectionTimeoutMillis: 5000,
+          }
+        };
+      },
+      inject: [ConfigService],
+    }),
     RagModule,
     LegalDocsModule,
     AuthModule,
@@ -48,3 +47,4 @@ import { LegalDocument } from './legal-docs/entities/legal-document.entity';
   providers: [AppService],
 })
 export class AppModule {}
+

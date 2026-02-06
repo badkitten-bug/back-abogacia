@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get } from '@nestjs/common';
+import { Controller, Post, Body, Get, Delete, Param } from '@nestjs/common';
 import { LegalDocsService } from './legal-docs.service';
 import { CreateLegalDocDto } from './dto/create-legal-doc.dto';
 
@@ -15,4 +15,10 @@ export class LegalDocsController {
   findAll() {
     return this.legalDocsService.findAll();
   }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.legalDocsService.remove(id);
+  }
 }
+
