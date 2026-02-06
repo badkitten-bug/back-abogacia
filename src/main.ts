@@ -4,13 +4,20 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   
+  // CORS configuration - allows frontend URL from env or all origins
+  const corsOrigins = process.env.CORS_ORIGINS 
+    ? JSON.parse(process.env.CORS_ORIGINS) 
+    : '*';
+  
   app.enableCors({
-    origin: '*', // Allow Next.js frontend
+    origin: corsOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
 
-  await app.listen(8000);
-  console.log('Backend running on http://localhost:8000');
+  // Use PORT from environment (required by Render) or default to 8000
+  const port = process.env.PORT || 8000;
+  await app.listen(port);
+  console.log(`Backend running on port ${port}`);
 }
 bootstrap();
